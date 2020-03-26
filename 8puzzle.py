@@ -1,133 +1,130 @@
-import random
+import time
 import itertools
-import collections
-
 class Node:
-    def __init__(self, puzzle, parent=None, action=None):
-        self.puzzle = puzzle
-        self.parent = parent
-        self.action = action
+	def __init__(self, puzzle, last=None):        
+		self.puzzle = puzzle        
+		self.last = last    
 
-    @property
-    def state(self):
-        return str(self)
+	@property    
+	def seq(self): # to keep track of the sequence used to get to the goal        
+		node, seq = self, []        
+		while node:            
+			seq.append(node)            
+			node = node.last        
+			yield from reversed(seq)    
 
-    @property 
-    def path(self):
-        node, p = self, []
-        while node:
-            p.append(node)
-            node = node.parent
-        yield from reversed(p)
+	@property    
+	def state(self):        
+		return str(self.puzzle.board) # hashable so it can be compared in sets    
 
-    @property
-    def solved(self):
-        return self.puzzle.solved
+	@property    
+	def isSolved(self):        
+		return self.puzzle.isSolved    
 
-    @property
-    def actions(self):
-        return self.puzzle.actions
+	@property    
+	def getMoves(self):        
+		return self.puzzle.getMoves
 
-    def __str__(self):
-        return str(self.puzzle)
+class Puzzle:    
+	def __init__(self, startBoard):        
+		self.board = startBoard    
 
-class Solver:
-    
-    def __init__(self, start):
-        self.start = start
+	@property    
+	def getMoves(self):        
+		possibleNewBoards = []        
+		zeroPos = self.board.index(0) # find the zero tile to determine possible moves        
+		if zeroPos == 0:            
+			possibleNewBoards.append(self.move(0,1))           
+			possibleNewBoards.append(self.move(0,3))        
+		elif zeroPos == 1:            
+			possibleNewBoards.append(self.move(1,0))            
+			possibleNewBoards.append(self.move(1,2))            
+			possibleNewBoards.append(self.move(1,4))        
+		elif zeroPos == 2:            
+			possibleNewBoards.append(self.move(2,1))            
+			possibleNewBoards.append(self.move(2,5))        
+		elif zeroPos == 3:            
+			possibleNewBoards.append(self.move(3,0))            
+			possibleNewBoards.append(self.move(3,4))            
+			possibleNewBoards.append(self.move(3,6))        
+		elif zeroPos == 4:            
+			possibleNewBoards.append(self.move(4,1))            
+			possibleNewBoards.append(self.move(4,3))            
+			possibleNewBoards.append(self.move(4,5))            
+			possibleNewBoards.append(self.move(4,7))       
+		elif zeroPos == 5:            
+			possibleNewBoards.append(self.move(5,2))            
+			possibleNewBoards.append(self.move(5,4))            
+			possibleNewBoards.append(self.move(5,8))        
+		elif zeroPos == 6:            
+			possibleNewBoards.append(self.move(6,3))            
+			possibleNewBoards.append(self.move(6,7))        
+		elif zeroPos == 7:            
+			possibleNewBoards.append(self.move(7,4))
+			possibleNewBoards.append(self.move(7,6))            
+			possibleNewBoards.append(self.move(7,8))        
+		else:            
+			possibleNewBoards.append(self.move(8,5))            
+			possibleNewBoards.append(self.move(8,7))        
+		return possibleNewBoards # returns Puzzle objects (maximum of 4 at a time)    
 
-    def solve(self):
-       
-        queue = collections.deque([Node(self.start)])
-        seen  = set()
-        seen.add(queue[0].state)
-        while queue:
-            node = queue.pop()
-            if node.solved:
-                return node.path
+	def move(self, current, to):        
+		changeBoard = self.board[:] # create a copy        
+		changeBoard[to], changeBoard[current] = changeBoard[current], changeBoard[to] # switch the tiles at the passed positions        
+		return Puzzle(changeBoard) # return a new Puzzle object    
 
-            for move, action in node.actions:
-                child = Node(move(), node, action)
+	def printPuzzle(self): # prints board in 8 puzzle style        
+		copyBoard = self.board[:]        
+		for i in range(9):            
+			if i == 2 or i == 5:                
+				print((str)(copyBoard[i]))            
+			else:                
+				print((str)(copyBoard[i]), end=" ")        
+		print('\n')    
 
-                if child.state not in seen:
-                    queue.appendleft(child)
-                    seen.add(child.state)
+	@property    
+	def isSolved(self):        
+		return self.board == [0,1,2,3,4,5,6,7,8] # goal board
 
-class Puzzle:
-    
-    def __init__(self, board):
-        self.width = len(board[0])
-        self.board = board
+class Solver:    
+	def __init__(self, Puzzle):        
+		self.puzzle = Puzzle    
 
-    @property
-    def solved(self):
-       
-        N = self.width * self.width
-        return str(self) == ''.join(map(str, range(1,N))) + '0'
+	def IDDFS(self):        
+		def DLS(currentNode, depth):            
+			if depth == 0:                
+				return None            
+			if currentNode.isSolved:                
+				return currentNode            
+			elif depth > 0:                
+				for board in currentNode.getMoves:                    
+					nextNode = Node(board, currentNode)                    
+					if nextNode.state not in visited:                        
+						visited.add(nextNode.state)                        
+						goalNode = DLS(nextNode, depth - 1)                        
+						if goalNode != None: # I thought this should be redundant but itnever finds a soln if I take it out                            
+							if goalNode.isSolved: # same as above ^                                
+								return goalNode        
+		for depth in itertools.count():            
+			visited = set()           
+			startNode = Node(self.puzzle)            
+			#print(startNode.isSolved)            
+			goalNode = DLS(startNode, depth)            
+			if goalNode != None:                
+				if goalNode.isSolved:                    
+					return goalNode.seq
 
-    @property 
-    def actions(self):
-        
-        def create_move(at, to):
-            return lambda: self._move(at, to)
+startingBoard = [7,2,4,5,0,6,8,3,1]
+myPuzzle = Puzzle(startingBoard)
+mySolver = Solver(myPuzzle)
+start = time.time()
+goalSeq = mySolver.IDDFS()
+end = time.time()
+counter = -1 # starting state doesn't count as a move
+for node in goalSeq:    
+	counter = counter + 1
+	node.puzzle.printPuzzle()
 
-        moves = []
-        for i, j in itertools.product(range(self.width),
-                                      range(self.width)):
-            direcs = {'R':(i, j-1),
-                      'L':(i, j+1),
-                      'D':(i-1, j),
-                      'U':(i+1, j)}
-
-            for action, (r, c) in direcs.items():
-                if r >= 0 and c >= 0 and r < self.width and c < self.width and \
-                   self.board[r][c] == 0:
-                    move = create_move((i,j), (r,c)), action
-                    moves.append(move)
-        return moves
-
-    def shuffle(self):
-       
-        puzzle = self
-        for _ in range(1000):
-            puzzle = random.choice(puzzle.actions)[0]()
-        return puzzle
-
-    def copy(self):
-        
-        board = []
-        for row in self.board:
-            board.append([x for x in row])
-        return Puzzle(board)
-
-    def _move(self, at, to):
-        
-        copy = self.copy()
-        i, j = at
-        r, c = to
-        copy.board[i][j], copy.board[r][c] = copy.board[r][c], copy.board[i][j]
-        return copy
-
-    def pprint(self):
-        for row in self.board:
-            print(row)
-        print()
-
-    def __str__(self):
-        return ''.join(map(str, self))
-
-    def __iter__(self):
-        for row in self.board:
-            yield from row
-
-    
-board = [[1,2,3],[4,0,6],[7,5,8]]
-
-puzzle = Puzzle(board)
-puzzle = puzzle.shuffle()
-s = Solver(puzzle)
-p = s.solve()
-
-for node in p:
-    print(node.action)
-    node.puzzle.pprint()
+print("Total number of moves: " + str(counter))
+totalTime = end - start
+print("Total searching time: %.2f seconds" % (totalTime))
